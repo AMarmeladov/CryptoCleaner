@@ -56,7 +56,6 @@ run_console.bat --scan
 
 ## Скачать готовую сборку
 
-- [`dist/CryptoCleaner.exe`](dist/CryptoCleaner.exe) — готовая сборка для Windows, Python не требуется.
 - [Последний релиз](https://github.com/AMarmeladov/CryptoCleaner/releases/latest) — EXE и контрольная сумма.
 - SHA-256: `F09DCC04694E8C5A3764A6C371F105B9573C92D73D149749A5B1E8EAC37B3D3D`.
 
