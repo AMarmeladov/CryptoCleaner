@@ -29,8 +29,6 @@ CryptoAPI (`CertVerifyRevocation`): статус «отозван» заявля
 Python 3.8). Внешние библиотеки не нужны: только стандартная библиотека
 Python и Tkinter.
 
-Автор: **Алексей Мармеладов**, 2026 — <https://github.com/AMarmeladov>
-
 ---
 
 ## Быстрый старт
