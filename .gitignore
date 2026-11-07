@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+
+# PyInstaller
+build/
+dist/*
+!dist/CryptoCleaner.exe
+*.spec
+
+# Runtime data and logs
+Backups/
+log_*.log
+*.ccbackup
+PASSWORD.txt
+
+# Old/local artifacts
+/CryptoCleaner.exe
+/_CryptoCleaner.exe
+/Cert cleaner.rar
+/1794059231.png
+/CertCleaner.ps1
