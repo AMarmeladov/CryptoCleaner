@@ -32,8 +32,12 @@ from .model import (
     BackupSummary,
     Certificate,
     Container,
+    ISSUER_GROUP_MINTSIFRY,
+    ISSUER_GROUP_OTHER,
+    ISSUER_GROUP_TREASURY,
     OperationResult,
     format_dt,
+    issuer_group,
 )
 from .restore import (
     BackupContents,
@@ -45,7 +49,7 @@ from .scanner import ScanCancelled, Scanner, ScanResult
 from .tools import ToolRunner
 
 APP_TITLE = "CryptoCleaner — сертификаты и контейнеры КриптоПро"
-APP_VERSION = "2.1.2"
+APP_VERSION = "2.2.0"
 AUTHOR = "Алексей Мармеладов"
 AUTHOR_YEAR = "2026"
 AUTHOR_URL = "https://github.com/AMarmeladov"
@@ -80,6 +84,22 @@ CERT_FILTERS = [
     "С закрытым ключом",
     "Отозванные",
 ]
+CERT_ISSUERS = [
+    "Все издатели",
+    "Минцифры",
+    "Казначейство",
+    "Прочие",
+]
+CERT_ISSUER_GROUPS = {
+    "Минцифры": ISSUER_GROUP_MINTSIFRY,
+    "Казначейство": ISSUER_GROUP_TREASURY,
+    "Прочие": ISSUER_GROUP_OTHER,
+}
+CERT_ISSUER_LABELS = {
+    ISSUER_GROUP_MINTSIFRY: "Минцифры",
+    ISSUER_GROUP_TREASURY: "Казначейство",
+    ISSUER_GROUP_OTHER: "Прочие",
+}
 CONT_FILTERS = [
     "Все",
     "Проблемные",
@@ -235,6 +255,29 @@ class ResultsWindow(tk.Toplevel):
                 justify="left",
             ).pack(anchor="w", pady=(master.px(4), 0))
 
+        buttons = tk.Frame(self, bg=BG)
+        buttons.pack(
+            side="bottom",
+            fill="x",
+            padx=master.px(14),
+            pady=(master.px(4), master.px(14)),
+        )
+        ttk.Button(buttons, text="Закрыть", command=self.destroy).pack(
+            side="right"
+        )
+        if open_path:
+            ttk.Button(
+                buttons,
+                text="Открыть папку",
+                command=lambda: master._open_path(open_path),
+            ).pack(side="left")
+        elif backup is not None:
+            ttk.Button(
+                buttons,
+                text="Открыть папку резервной копии",
+                command=lambda: master._open_path(backup.path),
+            ).pack(side="left")
+
         body = tk.Frame(self, bg=BG)
         body.pack(fill="both", expand=True, padx=master.px(14), pady=master.px(6))
         body.rowconfigure(0, weight=3)
@@ -247,7 +290,11 @@ class ResultsWindow(tk.Toplevel):
         tree_frame.rowconfigure(0, weight=1)
         tree_frame.columnconfigure(0, weight=1)
         tree = ttk.Treeview(
-            tree_frame, columns=columns, show="headings", selectmode="browse"
+            tree_frame,
+            columns=columns,
+            show="headings",
+            selectmode="browse",
+            height=8,
         )
         headings = {
             "status": ("Результат", 105),
@@ -286,7 +333,7 @@ class ResultsWindow(tk.Toplevel):
         ).grid(row=0, column=0, sticky="w")
         text = tk.Text(
             details_frame,
-            height=7,
+            height=5,
             wrap="word",
             font=master.font(11, family="Consolas"),
             bg=CARD,
@@ -342,27 +389,6 @@ class ResultsWindow(tk.Toplevel):
 
         tree.bind("<<TreeviewSelect>>", on_select)
 
-        buttons = tk.Frame(self, bg=BG)
-        buttons.pack(
-            fill="x",
-            padx=master.px(14),
-            pady=(master.px(4), master.px(14)),
-        )
-        ttk.Button(buttons, text="Закрыть", command=self.destroy).pack(
-            side="right"
-        )
-        if open_path:
-            ttk.Button(
-                buttons,
-                text="Открыть папку",
-                command=lambda: master._open_path(open_path),
-            ).pack(side="left")
-        elif backup is not None:
-            ttk.Button(
-                buttons,
-                text="Открыть папку резервной копии",
-                command=lambda: master._open_path(backup.path),
-            ).pack(side="left")
         if results:
             tree.selection_set("0")
             on_select()
@@ -1395,8 +1421,8 @@ class CryptoCleanerApp(tk.Tk):
             side="left"
         )
         self.cert_search = tk.StringVar()
-        ttk.Entry(top, textvariable=self.cert_search, width=32).pack(
-            side="left", padx=(self.px(4), self.px(12))
+        ttk.Entry(top, textvariable=self.cert_search, width=28).pack(
+            side="left", padx=(self.px(4), self.px(10))
         )
         tk.Label(top, text="Статус:", bg=BG, fg=TEXT, font=self.font(12)).pack(
             side="left"
@@ -1407,21 +1433,50 @@ class CryptoCleanerApp(tk.Tk):
             textvariable=self.cert_filter,
             values=CERT_FILTERS,
             state="readonly",
-            width=20,
+            width=18,
         )
-        combo.pack(side="left", padx=(self.px(4), self.px(12)))
-        ttk.Button(
-            top, text="Отметить просроченные", command=self._check_expired_certs
-        ).pack(side="left")
-        ttk.Button(top, text="Отметить всё", command=self._check_all_certs).pack(
-            side="left", padx=(self.px(6), 0)
+        combo.pack(side="left", padx=(self.px(4), self.px(10)))
+        tk.Label(top, text="Издатель:", bg=BG, fg=TEXT, font=self.font(12)).pack(
+            side="left"
         )
-        ttk.Button(top, text="Снять отметки", command=self._uncheck_certs).pack(
-            side="left", padx=(self.px(6), 0)
+        self.cert_issuer = tk.StringVar(value=CERT_ISSUERS[0])
+        issuer_combo = ttk.Combobox(
+            top,
+            textvariable=self.cert_issuer,
+            values=CERT_ISSUERS,
+            state="readonly",
+            width=16,
         )
+        issuer_combo.pack(side="left", padx=(self.px(4), 0))
 
         self.cert_search.trace_add("write", lambda *_a: self._refresh_certs())
         combo.bind("<<ComboboxSelected>>", lambda _e: self._refresh_certs())
+        issuer_combo.bind("<<ComboboxSelected>>", lambda _e: self._refresh_certs())
+
+        actions = tk.Frame(tab, bg=BG)
+        actions.pack(fill="x", padx=2, pady=(0, self.px(4)))
+        tk.Label(
+            actions, text="Отметить:", bg=BG, fg=TEXT, font=self.font(12)
+        ).pack(side="left")
+        ttk.Button(
+            actions,
+            text="Минцифры",
+            command=lambda: self._select_issuer_certs(ISSUER_GROUP_MINTSIFRY),
+        ).pack(side="left", padx=(self.px(4), 0))
+        ttk.Button(
+            actions,
+            text="Казначейство",
+            command=lambda: self._select_issuer_certs(ISSUER_GROUP_TREASURY),
+        ).pack(side="left", padx=(self.px(4), 0))
+        ttk.Button(
+            actions, text="Просроченные", command=self._check_expired_certs
+        ).pack(side="left", padx=(self.px(12), 0))
+        ttk.Button(actions, text="Все", command=self._check_all_certs).pack(
+            side="left", padx=(self.px(4), 0)
+        )
+        ttk.Button(actions, text="Снять", command=self._uncheck_certs).pack(
+            side="left", padx=(self.px(4), 0)
+        )
 
         pane = ttk.Panedwindow(tab, orient="vertical")
         pane.pack(fill="both", expand=True, padx=2, pady=(0, self.px(4)))
@@ -1435,6 +1490,7 @@ class CryptoCleanerApp(tk.Tk):
             "status",
             "revocation",
             "name",
+            "issuer",
             "subject",
             "expires",
             "stores",
@@ -1446,22 +1502,33 @@ class CryptoCleanerApp(tk.Tk):
         )
         headings = {
             "sel": ("✓", 36),
-            "status": ("Статус", 215),
-            "revocation": ("Отзыв", 150),
-            "name": ("Имя / CN", 230),
-            "subject": ("Субъект", 300),
+            "status": ("Статус", 205),
+            "revocation": ("Отзыв", 140),
+            "name": ("Имя / CN", 220),
+            "issuer": ("Издатель", 260),
+            "subject": ("Субъект", 280),
             "expires": ("Действителен до", 135),
-            "stores": ("Хранилища", 230),
-            "containers": ("Контейнеры", 170),
+            "stores": ("Хранилища", 220),
+            "containers": ("Контейнеры", 160),
             "thumb": ("Отпечаток SHA1", 300),
         }
+        self._cert_headings = headings
+        self._cert_sort_column = ""
+        self._cert_sort_reverse = False
         for key, (heading, width) in headings.items():
-            tree.heading(key, text=heading)
+            if key == "sel":
+                tree.heading(key, text=heading)
+            else:
+                tree.heading(
+                    key,
+                    text=heading,
+                    command=lambda k=key: self._sort_certs(k),
+                )
             tree.column(
                 key,
                 width=self.px(width),
                 anchor="center" if key in ("sel", "expires") else "w",
-                stretch=key in ("name", "subject", "stores", "thumb"),
+                stretch=key in ("name", "issuer", "subject", "stores", "thumb"),
             )
         tree.tag_configure("expired", foreground=DANGER)
         tree.tag_configure("revoked", foreground=DANGER)
@@ -1920,6 +1987,10 @@ class CryptoCleanerApp(tk.Tk):
             ).lower()
             if text not in haystack:
                 return False
+        issuer_mode = self.cert_issuer.get()
+        group = CERT_ISSUER_GROUPS.get(issuer_mode)
+        if group and issuer_group(cert.issuer) != group:
+            return False
         mode = self.cert_filter.get()
         if mode == "Просроченные":
             return cert.is_expired
@@ -1983,19 +2054,88 @@ class CryptoCleanerApp(tk.Tk):
             return not container.info_known
         return True
 
+    @staticmethod
+    def _cert_state(cert: Certificate) -> str:
+        if cert.revocation == "revoked":
+            return "revoked"
+        if not cert.date_known:
+            return "unknown"
+        if cert.is_expired:
+            return "expired"
+        return "valid"
+
+    def _cert_sort_key(self, cert: Certificate, column: str):
+        if column == "status":
+            rank = {"revoked": 0, "expired": 1, "unknown": 2, "valid": 3}
+            return rank.get(self._cert_state(cert), 4)
+        if column == "revocation":
+            return cert.revocation_short.lower()
+        if column == "name":
+            return cert.display_name.lower()
+        if column == "issuer":
+            group = issuer_group(cert.issuer)
+            rank = {
+                ISSUER_GROUP_MINTSIFRY: 0,
+                ISSUER_GROUP_TREASURY: 1,
+                ISSUER_GROUP_OTHER: 2,
+            }.get(group, 3)
+            return (rank, cert.issuer.lower())
+        if column == "subject":
+            return cert.subject.lower()
+        if column == "expires":
+            if cert.not_after is None:
+                return (1, 0.0)
+            return (0, cert.not_after.timestamp())
+        if column == "stores":
+            return cert.source_display.lower()
+        if column == "containers":
+            return cert.container_display.lower()
+        if column == "thumb":
+            return cert.thumbprint
+        return cert.display_name.lower()
+
+    def _sort_certs(self, column: str) -> None:
+        if column == "sel":
+            return
+        if self._cert_sort_column == column:
+            self._cert_sort_reverse = not self._cert_sort_reverse
+        else:
+            self._cert_sort_column = column
+            self._cert_sort_reverse = False
+        self._refresh_certs()
+
+    def _update_cert_headings(self) -> None:
+        tree = getattr(self, "cert_tree", None)
+        if tree is None:
+            return
+        for key, (heading, _width) in self._cert_headings.items():
+            text = heading
+            if key == self._cert_sort_column:
+                text += " ▼" if self._cert_sort_reverse else " ▲"
+            tree.heading(key, text=text)
+
     def _refresh_certs(self) -> None:
         tree = getattr(self, "cert_tree", None)
         if tree is None:
             return
-        selected = set(tree.selection())
+        selected_thumbprints = set()
+        for iid in tree.selection():
+            cert = self._cert_rows.get(iid)
+            if cert is not None:
+                selected_thumbprints.add(cert.thumbprint)
         tree.delete(*tree.get_children())
         self._cert_rows.clear()
-        index = 0
-        for cert in self.certificates:
-            if not self._cert_matches(cert):
-                continue
+        self._update_cert_headings()
+        certs = [cert for cert in self.certificates if self._cert_matches(cert)]
+        if self._cert_sort_column:
+            certs.sort(
+                key=lambda item: self._cert_sort_key(
+                    item, self._cert_sort_column
+                ),
+                reverse=self._cert_sort_reverse,
+            )
+        for index, cert in enumerate(certs):
             iid = str(index)
-            index += 1
             self._cert_rows[iid] = cert
             if cert.revocation == "revoked":
                 tag = "revoked"
@@ -2014,6 +2154,7 @@ class CryptoCleanerApp(tk.Tk):
                     cert.status,
                     cert.revocation_short,
                     _truncate(cert.display_name, 100),
+                    _truncate(cert.issuer, 120),
                     _truncate(cert.subject, 150),
                     format_dt(cert.not_after),
                     _truncate(cert.source_display, 120),
@@ -2022,8 +2163,8 @@ class CryptoCleanerApp(tk.Tk):
                 ),
                 tags=(tag,),
             )
-        for iid in selected:
-            if tree.exists(iid):
+        for iid, cert in self._cert_rows.items():
+            if cert.thumbprint in selected_thumbprints:
                 tree.selection_add(iid)
 
     def _refresh_conts(self) -> None:
@@ -2130,6 +2271,41 @@ class CryptoCleanerApp(tk.Tk):
             if cert.is_expired and self._cert_matches(cert):
                 self.checked_certs.add(cert.thumbprint)
         self._refresh_certs()
+
+    def _select_issuer_certs(self, group: str) -> None:
+        """Отметить все сертификаты выбранного издателя и предложить удалить."""
+        label = CERT_ISSUER_LABELS.get(group, group)
+        self.cert_issuer.set(label)
+        self.cert_filter.set("Все")
+        if self.cert_search.get():
+            self.cert_search.set("")
+        self._refresh_certs()
+        matched = [
+            cert
+            for cert in self.certificates
+            if issuer_group(cert.issuer) == group
+        ]
+        if not matched:
+            messagebox.showinfo(
+                "Сертификаты: %s" % label,
+                "Сертификаты, выпущенные УЦ «%s», не найдены." % label,
+                parent=self,
+            )
+            return
+        self.checked_certs = {cert.thumbprint for cert in matched}
+        self._refresh_certs()
+        self.status_label.configure(
+            text="Отмечено сертификатов «%s»: %d" % (label, len(matched))
+        )
+        if not messagebox.askyesno(
+            "Удаление сертификатов",
+            "Отмечено сертификатов, выпущенных УЦ «%s»: %d.\n\n"
+            "Удалить их из системы сейчас?" % (label, len(matched)),
+            icon="warning",
+            parent=self,
+        ):
+            return
+        self._on_delete()
 
     def _check_all_certs(self) -> None:
         for cert in self.certificates:

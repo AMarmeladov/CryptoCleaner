@@ -11,6 +11,42 @@ def normalize_thumb(value: Optional[str]) -> str:
     return re.sub(r"[^0-9A-Fa-f]", "", value or "").upper()
 
 
+# Признаки издателей, которые важно выделять отдельно: сертификаты,
+# выпущенные УЦ Минцифры (включая прежнее название Минкомсвязь и НУЦ России)
+# и УЦ Федерального казначейства.
+ISSUER_GROUP_MINTSIFRY = "mintsifry"
+ISSUER_GROUP_TREASURY = "treasury"
+ISSUER_GROUP_OTHER = "other"
+
+_MINTSIFRY_MARKERS = (
+    "минцифр",
+    "минкомсвяз",
+    "нуц россии",
+    "digital.gov.ru",
+    "minsvyaz.ru",
+)
+_TREASURY_MARKERS = (
+    "казначейств",
+    "roskazna",
+)
+
+
+def issuer_group(issuer: Optional[str]) -> str:
+    """Определить группу издателя сертификата.
+
+    Возвращает ``mintsifry`` для УЦ Минцифры (Минкомсвязь, НУЦ России),
+    ``treasury`` для УЦ Федерального казначейства и ``other`` для остальных.
+    Сравнение идёт по подстроке без учёта регистра, потому что DN издателей
+    отличаются порядком атрибутов и формулировками.
+    """
+    value = (issuer or "").lower()
+    if any(marker in value for marker in _MINTSIFRY_MARKERS):
+        return ISSUER_GROUP_MINTSIFRY
+    if any(marker in value for marker in _TREASURY_MARKERS):
+        return ISSUER_GROUP_TREASURY
+    return ISSUER_GROUP_OTHER
+
+
 def format_dt(value: Optional[datetime], fmt: str = "%d.%m.%Y %H:%M:%S") -> str:
     if not value:
         return "—"

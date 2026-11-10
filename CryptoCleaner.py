@@ -417,7 +417,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--log", default="", help="путь к файлу журнала"
     )
     parser.add_argument(
-        "--version", action="version", version="CryptoCleaner 2.1.2"
+        "--version", action="version", version="CryptoCleaner 2.2.0"
     )
     return parser
 
